@@ -1,0 +1,30 @@
+# "docker compose up --build" démarre 2 conteneurs : la base PostgreSQL et l'API.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atelier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Renseignez POSTGRES_PASSWORD dans .env}
+      POSTGRES_DB: ${POSTGRES_DB:-atelier}
+    volumes:
+      - donnees_postgres:/var/lib/postgresql/data   # les données survivent à un redémarrage
+    healthcheck:   # l'API attend que la base soit vraiment prête
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atelier} -d ${POSTGRES_DB:-atelier}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      # Dans Docker, la base s'appelle "db" (le nom du service), pas "localhost"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-atelier}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-atelier}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  donnees_postgres:
